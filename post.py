@@ -121,25 +121,9 @@ def write_post(article):
         print(f"Failed to parse Gemini response: {text[:200]}")
         sys.exit(1)
 
-def make_image(prompt):
-    print("Generating image with Pollinations.ai...")
-    truncated_prompt = prompt[:800]
-    safe_prompt = urllib.parse.quote(truncated_prompt + ", highly engaging YouTube thumbnail style, purely related to the topic, vibrant colors, dramatic lighting, no text")
-    url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1200&height=627&nologo=true"
-    
-    for i in range(3):
-        try:
-            resp = requests.get(url)
-            if resp.status_code == 200 and 'image' in resp.headers.get('content-type', ''):
-                with open("image.jpg", "wb") as f:
-                    f.write(resp.content)
-                return "image.jpg"
-            else:
-                print(f"Attempt {i+1} failed: Status {resp.status_code}, Content-Type: {resp.headers.get('content-type', '')}")
-        except Exception as e:
-            print(f"Attempt {i+1} error: {e}")
-        time.sleep(2)
-    return None
+from thumb import make_image
+
+
 
 def escape_little_text(text):
     for char in ['(', ')', '[', ']', '{', '}']:
@@ -218,7 +202,7 @@ def main():
     with open("preview.txt", "w", encoding="utf-8") as f:
         f.write(post_text)
         
-    image_path = make_image(image_prompt)
+    image_path = make_image(image_prompt, headline=top_article['title'])
     if not image_path:
         print("Failed to generate image.")
         sys.exit(1)
