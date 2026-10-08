@@ -27,7 +27,7 @@ MAX_POSTED_HISTORY = 200
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 LINKEDIN_TOKEN = os.environ.get("LINKEDIN_TOKEN")
 LINKEDIN_AUTHOR = os.environ.get("LINKEDIN_AUTHOR")
-LINKEDIN_VERSION = os.environ.get("LINKEDIN_VERSION", "202401")
+LINKEDIN_VERSION = os.environ.get("LINKEDIN_VERSION", "202609")
 DRY_RUN = os.environ.get("DRY_RUN", "true").lower() in ("true", "1", "yes")
 
 # --- Helpers ---
