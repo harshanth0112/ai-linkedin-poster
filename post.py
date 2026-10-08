@@ -98,7 +98,7 @@ def write_post(article):
     }}
     """
     
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
@@ -111,9 +111,9 @@ def write_post(article):
             return data["post"], data["image_prompt"]
         except Exception as e:
             print(f"Gemini API attempt {attempt + 1} failed: {e}")
-            time.sleep(5)
+            time.sleep(15)
             
-    print("Failed to generate or parse content from Gemini after 3 attempts.")
+    print("Failed to generate or parse content from Gemini after 5 attempts.")
     sys.exit(1)
 
 def make_image(prompt):
