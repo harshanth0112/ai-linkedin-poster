@@ -6,6 +6,10 @@ import requests
 import feedparser
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from gemini_helper import call_gemini
 
 # --- Configuration ---
@@ -27,8 +31,11 @@ DRY_RUN = os.environ.get("DRY_RUN", "true").lower() in ("true", "1", "yes")
 
 def load_posted():
     if os.path.exists(POSTED_FILE):
-        with open(POSTED_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(POSTED_FILE, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return []
     return []
 
 def save_posted(posted_links):
@@ -45,8 +52,8 @@ def fetch_news(posted_links):
         try:
             feed = feedparser.parse(feed_url)
             for entry in feed.entries[:10]:
-                link = entry.link
-                if link in posted_links:
+                link = getattr(entry, 'link', None)
+                if not link or link in posted_links:
                     continue
                 
                 published_parsed = entry.get('published_parsed')
@@ -56,7 +63,7 @@ def fetch_news(posted_links):
                         continue
 
                 articles.append({
-                    "title": entry.title,
+                    "title": getattr(entry, 'title', 'No Title'),
                     "link": link,
                     "summary": entry.get('summary', '')[:500],
                     "published": published_parsed
@@ -97,7 +104,15 @@ def write_post(article):
     
     text = call_gemini(prompt, json_mode=True)
     try:
-        data = json.loads(text)
+        clean_text = text.strip()
+        if clean_text.startswith("```json"):
+            clean_text = clean_text[7:]
+        elif clean_text.startswith("```"):
+            clean_text = clean_text[3:]
+        if clean_text.endswith("```"):
+            clean_text = clean_text[:-3]
+            
+        data = json.loads(clean_text.strip())
         return data["post"], data["image_prompt"]
     except (json.JSONDecodeError, KeyError):
         print(f"Failed to parse Gemini response: {text[:200]}")
@@ -105,7 +120,8 @@ def write_post(article):
 
 def make_image(prompt):
     print("Generating image with Pollinations.ai...")
-    safe_prompt = urllib.parse.quote(prompt + ", highly engaging YouTube thumbnail style, purely related to the topic, vibrant colors, dramatic lighting, no text")
+    truncated_prompt = prompt[:800]
+    safe_prompt = urllib.parse.quote(truncated_prompt + ", highly engaging YouTube thumbnail style, purely related to the topic, vibrant colors, dramatic lighting, no text")
     url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1200&height=627&nologo=true"
     
     for i in range(3):
@@ -135,41 +151,50 @@ def publish_linkedin(post_text, image_path):
         "X-Restli-Protocol-Version": "2.0.0"
     }
 
-    # 1. Initialize Upload
-    init_url = "https://api.linkedin.com/rest/images?action=initializeUpload"
-    init_data = {"initializeUploadRequest": {"owner": LINKEDIN_AUTHOR}}
-    resp = requests.post(init_url, headers=headers, json=init_data)
-    resp.raise_for_status()
-    init_res = resp.json()
-    upload_url = init_res["value"]["uploadUrl"]
-    image_urn = init_res["value"]["image"]
+    for attempt in range(3):
+        try:
+            # 1. Initialize Upload
+            init_url = "https://api.linkedin.com/rest/images?action=initializeUpload"
+            init_data = {"initializeUploadRequest": {"owner": LINKEDIN_AUTHOR}}
+            resp = requests.post(init_url, headers=headers, json=init_data, timeout=30)
+            resp.raise_for_status()
+            init_res = resp.json()
+            upload_url = init_res["value"]["uploadUrl"]
+            image_urn = init_res["value"]["image"]
 
-    # 2. Upload Image
-    with open(image_path, "rb") as f:
-        image_data = f.read()
-    upload_headers = {"Authorization": f"Bearer {LINKEDIN_TOKEN}"}
-    put_resp = requests.put(upload_url, headers=upload_headers, data=image_data)
-    put_resp.raise_for_status()
+            # 2. Upload Image
+            with open(image_path, "rb") as f:
+                image_data = f.read()
+            upload_headers = {"Authorization": f"Bearer {LINKEDIN_TOKEN}"}
+            put_resp = requests.put(upload_url, headers=upload_headers, data=image_data, timeout=60)
+            put_resp.raise_for_status()
 
-    # 3. Create Post
-    post_url = "https://api.linkedin.com/rest/posts"
-    post_data = {
-        "author": LINKEDIN_AUTHOR,
-        "commentary": escape_little_text(post_text),
-        "visibility": "PUBLIC",
-        "distribution": {
-            "feedDistribution": "MAIN_FEED",
-            "targetEntities": [],
-            "thirdPartyDistributionChannels": []
-        },
-        "content": {"media": {"id": image_urn}},
-        "lifecycleState": "PUBLISHED",
-        "isReshareDisabledByAuthor": False
-    }
-    
-    post_resp = requests.post(post_url, headers=headers, json=post_data)
-    post_resp.raise_for_status()
-    print("Post successful!")
+            # 3. Create Post
+            post_url = "https://api.linkedin.com/rest/posts"
+            post_data = {
+                "author": LINKEDIN_AUTHOR,
+                "commentary": escape_little_text(post_text),
+                "visibility": "PUBLIC",
+                "distribution": {
+                    "feedDistribution": "MAIN_FEED",
+                    "targetEntities": [],
+                    "thirdPartyDistributionChannels": []
+                },
+                "content": {"media": {"id": image_urn}},
+                "lifecycleState": "PUBLISHED",
+                "isReshareDisabledByAuthor": False
+            }
+            
+            post_resp = requests.post(post_url, headers=headers, json=post_data, timeout=30)
+            post_resp.raise_for_status()
+            print("Post successful!")
+            return
+        except Exception as e:
+            print(f"LinkedIn publish attempt {attempt + 1} failed: {e}")
+            if attempt < 2:
+                time.sleep(5)
+            else:
+                raise e
 
 def main():
     if not (GEMINI_API_KEY and LINKEDIN_TOKEN and LINKEDIN_AUTHOR):
