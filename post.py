@@ -98,19 +98,23 @@ def write_post(article):
     }}
     """
     
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-        ),
-    )
-    try:
-        data = json.loads(response.text)
-        return data["post"], data["image_prompt"]
-    except json.JSONDecodeError:
-        print("Failed to parse Gemini response as JSON.")
-        sys.exit(1)
+    for attempt in range(3):
+        try:
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
+            )
+            data = json.loads(response.text)
+            return data["post"], data["image_prompt"]
+        except Exception as e:
+            print(f"Gemini API attempt {attempt + 1} failed: {e}")
+            time.sleep(5)
+            
+    print("Failed to generate or parse content from Gemini after 3 attempts.")
+    sys.exit(1)
 
 def make_image(prompt):
     print("Generating image with Pollinations.ai...")
