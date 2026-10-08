@@ -89,7 +89,7 @@ def write_post(article):
     7. Length under 1200 characters.
 
     Also, write an image prompt that can be used to generate an accompanying AI image. 
-    The image should be professional, relevant to the topic, and have no text.
+    The image should be highly engaging, like a YouTube thumbnail, purely related to the core topic, and MUST NOT contain any text.
 
     Respond ONLY in valid JSON format:
     {{
@@ -118,7 +118,7 @@ def write_post(article):
 
 def make_image(prompt):
     print("Generating image with Pollinations.ai...")
-    safe_prompt = urllib.parse.quote(prompt + ", flat vector illustration, blue and purple palette, minimal")
+    safe_prompt = urllib.parse.quote(prompt + ", highly engaging YouTube thumbnail style, purely related to the topic, vibrant colors, dramatic lighting, no text")
     url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1200&height=627&nologo=true"
     
     for i in range(3):
