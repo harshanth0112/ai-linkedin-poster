@@ -6,9 +6,12 @@ import requests
 import feedparser
 import urllib.parse
 from datetime import datetime, timedelta, timezone
-from dotenv import load_dotenv
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from gemini_helper import call_gemini
 
