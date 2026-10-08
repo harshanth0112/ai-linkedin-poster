@@ -21,7 +21,7 @@ MAX_POSTED_HISTORY = 200
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 LINKEDIN_TOKEN = os.environ.get("LINKEDIN_TOKEN")
 LINKEDIN_AUTHOR = os.environ.get("LINKEDIN_AUTHOR")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-lite")
 LINKEDIN_VERSION = os.environ.get("LINKEDIN_VERSION", "202401")
 DRY_RUN = os.environ.get("DRY_RUN", "true").lower() in ("true", "1", "yes")
 
@@ -112,6 +112,10 @@ def write_post(article):
             return data["post"], data["image_prompt"]
         except Exception as e:
             attempt += 1
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                print(f"Daily quota exhausted for model {GEMINI_MODEL}. Exiting. Quota resets in ~24h.")
+                sys.exit(1)
             wait = min(60, 5 * attempt)
             print(f"Gemini API attempt {attempt} failed: {e}. Retrying in {wait}s...")
             time.sleep(wait)
