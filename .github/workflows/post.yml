@@ -33,6 +33,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LINKEDIN_TOKEN: ${{ secrets.LINKEDIN_TOKEN }}
           LINKEDIN_AUTHOR: ${{ secrets.LINKEDIN_AUTHOR }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_MODELS: "gemini-3.8-flash,gemini-1.5-flash"
           # On scheduled runs, dry_run input is empty → defaults to false (live post)
           # On manual runs, use whatever the user chose
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
