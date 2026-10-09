@@ -20,27 +20,53 @@ WINDOW_HOURS = int(os.getenv("NEWS_WINDOW_HOURS", "48"))
 HN_LOOKUPS = int(os.getenv("HN_LOOKUPS", "15"))
 
 FEEDS = [
-    ("https://openai.com/news/rss.xml", 3.0),
-    ("https://deepmind.google/blog/rss.xml", 3.0),
-    ("https://blog.google/technology/ai/rss/", 3.0),
-    ("https://research.google/blog/rss/", 3.0),
-    ("https://www.microsoft.com/en-us/research/feed/", 3.0),
-    ("https://blogs.nvidia.com/feed/", 3.0),
-    ("https://huggingface.co/blog/feed.xml", 3.0),
-    ("https://aws.amazon.com/blogs/machine-learning/feed/", 3.0),
-    ("https://bair.berkeley.edu/blog/feed.xml", 3.0),
-    ("https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml", 3.0),
-    ("https://www.technologyreview.com/topic/artificial-intelligence/feed", 2.5),
-    ("https://techcrunch.com/category/artificial-intelligence/feed/", 2.5),
-    ("https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", 2.5),
-    ("https://arstechnica.com/ai/feed/", 2.5),
-    ("https://www.wired.com/feed/tag/ai/latest/rss", 2.5),
-    ("https://venturebeat.com/category/ai/feed/", 2.5),
-    ("https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss", 2.5),
-    ("https://www.theguardian.com/technology/artificialintelligenceai/rss", 2.5),
-    ("https://simonwillison.net/atom/everything/", 1.5),
-    ("https://importai.substack.com/feed", 1.5),
-    ("https://www.interconnects.ai/feed", 1.5),
+# TIER 1: OFFICIAL AI COMPANIES & RESEARCH # Weight: 2.8–3.0 
+
+("https://openai.com/news/rss.xml", 2.8), 
+("https://deepmind.google/blog/rss.xml", 2.8), 
+("https://blog.google/technology/ai/rss/", 2.9), 
+("https://research.google/blog/rss/", 2.9), 
+("https://www.microsoft.com/en-us/research/feed/", 2.8), 
+("https://machinelearning.apple.com/rss.xml", 2.8), 
+("https://engineering.fb.com/feed/", 2.8), 
+("https://developer.nvidia.com/blog/feed/", 2.8), 
+("https://huggingface.co/blog/feed.xml", 2.8), 
+("https://aws.amazon.com/blogs/machine-learning/feed/", 2.8), 
+("https://bair.berkeley.edu/blog/feed.xml", 2.8), 
+("https://ai.stanford.edu/blog/feed.xml", 2.7), 
+("https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml", 2.7), 
+# TIER 2: INDIA — AI, BUSINESS & GOVERNMENT # Weight: 2.5–2.8 
+("https://indianexpress.com/section/technology/artificial-intelligence/feed/", 2.8), 
+("https://cio.economictimes.indiatimes.com/rss/artificial-intelligence", 2.7), 
+("https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=1", 2.6), 
+# Google News — India-focused AI searches 
+("https://news.google.com/rss/search?q=artificial+intelligence+India&hl=en-IN&gl=IN&ceid=IN:en", 2.2), 
+("https://news.google.com/rss/search?q=generative+AI+India&hl=en-IN&gl=IN&ceid=IN:en", 2.2), 
+("https://news.google.com/rss/search?q=AI+startups+India&hl=en-IN&gl=IN&ceid=IN:en", 2.0), 
+("https://news.google.com/rss/search?q=AI+policy+India&hl=en-IN&gl=IN&ceid=IN:en", 2.0), 
+# TIER 3: INDEPENDENT TECH JOURNALISM # Weight: 2.4–2.8 
+
+("https://www.technologyreview.com/topic/artificial-intelligence/feed", 2.8), 
+("https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss", 2.8), 
+("https://techcrunch.com/category/artificial-intelligence/feed/", 2.7), 
+("https://arstechnica.com/ai/feed/", 2.7), 
+("https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", 2.6), 
+("https://www.wired.com/feed/rss", 2.5), 
+("https://venturebeat.com/feed/", 2.6), 
+("https://www.theguardian.com/technology/artificialintelligenceai/rss", 2.5), 
+("https://the-decoder.com/feed/", 2.5), 
+("https://www.marktechpost.com/feed/", 2.2),
+ # Google News — global AI coverage 
+("https://news.google.com/rss/search?q=artificial+intelligence+technology&hl=en-US&gl=US&ceid=US:en", 2.1), 
+("https://news.google.com/rss/search?q=AI+research+breakthrough&hl=en-US&gl=US&ceid=US:en", 2.1), 
+("https://news.google.com/rss/search?q=large+language+model+release&hl=en-US&gl=US&ceid=US:en", 2.0), 
+# TIER 4: AI & MACHINE LEARNING RESEARCH # Note: Research papers may be preprints. 
+("https://rss.arxiv.org/rss/cs.AI", 2.7), 
+("https://rss.arxiv.org/rss/cs.LG", 2.7), 
+("https://rss.arxiv.org/rss/cs.CL", 2.5), 
+# Research conference announcements 
+("https://blog.neurips.cc/feed", 2.5), 
+("https://blog.iclr.cc/feed", 2.5), 
 ]
 
 def _get_domain(url):
