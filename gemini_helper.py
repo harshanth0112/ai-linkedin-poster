@@ -3,7 +3,7 @@ LLM caller with automatic fallback: Gemini models first, then Groq models.
 Uses plain requests (no SDK needed). Returns the reply as a plain string.
 
 Order of attempts:
-  1. Each model in GEMINI_MODELS (default: gemini-2.5-flash, gemini-2.5-flash-lite)
+  1. Each model in GEMINI_MODELS (default: gemini-3.8-flash)
   2. Each model in GROQ_MODELS   (default: qwen/qwen3.8-27b, llama-3.3-70b-versatile)
 
 Rules:
@@ -13,7 +13,7 @@ Rules:
 - Keys are read from environment variables only, never from files.
 
 Override the order from the workflow env, e.g.
-  GEMINI_MODELS: "gemini-2.5-flash-lite,gemini-2.5-flash"
+  GEMINI_MODELS: "gemini-3.8-flash"
   GROQ_MODELS:   "qwen/qwen3.8-27b,llama-3.3-70b-versatile"
 Model names change; check ai.google.dev and console.groq.com for what is currently available.
 """
@@ -28,7 +28,7 @@ def _models(var, default):
     return [m.strip() for m in os.getenv(var, default).split(",") if m.strip()]
 
 
-GEMINI_MODELS = _models("GEMINI_MODELS", "gemini-2.5-flash,gemini-2.5-flash-lite")
+GEMINI_MODELS = _models("GEMINI_MODELS", "gemini-3.8-flash")
 GROQ_MODELS = _models("GROQ_MODELS", "qwen/qwen3.8-27b,llama-3.3-70b-versatile")
 
 
@@ -54,7 +54,7 @@ def _try_gemini(model, prompt, json_mode):
                 return None, "empty or blocked response"
         last = f"HTTP {r.status_code} {r.text[:150]}"
         print(f"Gemini {model}: {last}")
-        if r.status_code in (429, 500, 503):
+        if r.status_code in (500, 503):
             time.sleep(wait)
             continue
         break  # 429 / 404 / 400: go to next model
@@ -90,10 +90,10 @@ def _try_groq(model, prompt, json_mode):
             return (text or None), ("" if text else "empty after cleanup")
         last = f"HTTP {r.status_code} {r.text[:150]}"
         print(f"Groq {model}: {last}")
-        if r.status_code in (429, 500, 502, 503):
+        if r.status_code in (500, 503):
             time.sleep(wait)
             continue
-        break  # 404 / 400: go to next model
+        break  # 429 / 404 / 400: go to next model
     return None, last
 
 
@@ -101,12 +101,16 @@ def call_gemini(prompt, json_mode=False):
     """Name kept for compatibility: tries Gemini, then Groq. Returns text."""
     last = "no models configured"
 
-    for model in GEMINI_MODELS:
-        text, err = _try_gemini(model, prompt, json_mode)
-        if text:
-            print(f"Used Gemini model: {model}")
-            return text
-        last = f"Gemini {model}: {err}"
+    if not os.getenv("GEMINI_API_KEY"):
+        print("GEMINI_API_KEY not set; skipping Gemini.")
+        last = "GEMINI_API_KEY not set"
+    else:
+        for model in GEMINI_MODELS:
+            text, err = _try_gemini(model, prompt, json_mode)
+            if text:
+                print(f"Used Gemini model: {model}")
+                return text
+            last = f"Gemini {model}: {err}"
 
     if os.getenv("GROQ_API_KEY"):
         print("All Gemini models failed. Trying Groq...")

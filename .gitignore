@@ -1,4 +1,9 @@
+scratch_*.py
+.env
+.linkedin_token.txt
 image.jpg
 preview.txt
+posted_test.json
 __pycache__/
-.env
+*.pyc
+*.local

@@ -30,9 +30,6 @@ STYLE = os.getenv(
     "modern digital illustration, clean composition, soft gradients, "
     "no text, no letters, no logos, no watermark, no real people",
 )
-IMAGE_MODELS = [
-    m.strip() for m in os.getenv("GEMINI_IMAGE_MODELS", "gemini-2.5-flash-image").split(",") if m.strip()
-]
 FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # GitHub Actions (Ubuntu)
     "C:\\Windows\\Fonts\\arialbd.ttf",                          # Windows
@@ -42,10 +39,16 @@ FONT_CANDIDATES = [
 
 # ---------- Sources ----------
 def _gemini_image(prompt):
+    models = [
+        m.strip() for m in os.getenv("GEMINI_IMAGE_MODELS", "gemini-2.5-flash-image").split(",") if m.strip()
+    ]
+    if not models:
+        print("Skipping Gemini image (GEMINI_IMAGE_MODELS is empty)")
+        return None
     key = os.getenv("GEMINI_API_KEY")
     if not key:
         return None
-    for model in IMAGE_MODELS:
+    for model in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         body = {
             "contents": [{"parts": [{"text": f"{prompt}. {STYLE}. Wide landscape 1.91:1 composition."}]}],
@@ -73,6 +76,8 @@ def _gemini_image(prompt):
 
 
 def _pollinations(prompt):
+    if os.getenv("ENABLE_POLLINATIONS", "1") == "0":
+        return None
     q = urllib.parse.quote(f"{prompt}, {STYLE}")
     url = f"https://image.pollinations.ai/prompt/{q}?width={W}&height={H}&nologo=true&seed={int(time.time())}"
     for _ in range(2):
@@ -205,7 +210,7 @@ def ai_background(prompt):
 def make_image(prompt, headline=None, path="image.jpg"):
     """Returns the saved image path. headline = short text drawn on the thumbnail (optional)."""
     img = _ai_image(prompt) or _fallback_background()
-    img = ImageOps.fit(img, (W, H), method=Image.LANCZOS)  # crop/resize to exactly 1200x627
+    img = ImageOps.fit(img, (W, H), method=Image.Resampling.LANCZOS)  # crop/resize to exactly 1200x627
     if headline and os.getenv("THUMB_TEXT", "1") == "1":
         img = _overlay_title(img, headline)
     img.save(path, "JPEG", quality=90)

@@ -1,5 +1,4 @@
-requests
-feedparser
-google-genai
-python-dotenv
-pillow
+requests==2.33.1
+feedparser==6.0.14
+python-dotenv==1.2.2
+pillow==12.1.1

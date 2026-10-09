@@ -11,55 +11,69 @@ on:
         default: true
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: linkedin-poster
+  cancel-in-progress: false
 
 jobs:
-  post:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-          
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests
+        run: python -m unittest discover -s . -p "test_*.py" -v
+
+  post:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
       - name: Install dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y fonts-dejavu-core
           pip install -r requirements.txt
-        
       - name: Run poster
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           LINKEDIN_TOKEN: ${{ secrets.LINKEDIN_TOKEN }}
           LINKEDIN_AUTHOR: ${{ secrets.LINKEDIN_AUTHOR }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          GEMINI_MODELS: "gemini-3.8-flash,gemini-1.5-flash"
-          # On scheduled runs, dry_run input is empty → defaults to false (live post)
-          # On manual runs, use whatever the user chose
+          LINKEDIN_VERSION: "202609"
+          MIN_SCORE: "8"
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: python post.py
-        
       - name: Archive preview artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: github.event.inputs.dry_run == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: preview
           path: |
             preview.txt
             image.jpg
-            
-      - name: Commit posted.json
-        # Commit when scheduled (no inputs) OR when manually run with dry_run=false
-        if: github.event.inputs.dry_run != 'true'
+      - name: Save posted history
+        if: always() && github.event.inputs.dry_run != 'true'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add posted.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update posted.json" && git push)
+          git diff --staged --quiet || (git commit -m "Update posted.json" && git push)
 
