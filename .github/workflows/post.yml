@@ -2,7 +2,7 @@ name: AI LinkedIn Poster
 
 on:
   schedule:
-    - cron: "15 8 * * *" # Runs daily at 03:30 UTC (9:00 AM IST)
+    - cron: "30 9 * * *" # Runs daily at 03:30 UTC (9:00 AM IST)
   workflow_dispatch:
     inputs:
       dry_run:
@@ -58,7 +58,7 @@ jobs:
           LINKEDIN_TOKEN: ${{ secrets.LINKEDIN_TOKEN }}
           LINKEDIN_AUTHOR: ${{ secrets.LINKEDIN_AUTHOR }}
           LINKEDIN_VERSION: "202609"
-          MIN_SCORE: "8"
+          MIN_SCORE: "6.7"
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: python post.py
       - name: Archive preview artifacts
