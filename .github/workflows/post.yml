@@ -2,7 +2,7 @@ name: AI LinkedIn Poster
 
 on:
   schedule:
-    - cron: "30 9 * * *" # Runs daily at 03:30 UTC (9:00 AM IST)
+    - cron: "30 2 * * *" # Runs daily at 03:30 UTC (9:00 AM IST)
   workflow_dispatch:
     inputs:
       dry_run:
