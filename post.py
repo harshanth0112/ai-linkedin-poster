@@ -110,11 +110,20 @@ line breaks, emojis, and hashtags.
 - Encourage substantive discussion, not likes, shares, or engagement bait.
 
 5. HASHTAGS AND EMOJIS
-- Include exactly max relevant hashtags at the end of the post.
+- Include max number of relevant hashtags at the end of the post.
 - Use relevant technical or industry-specific hashtags.
 - Do not use duplicate, misleading, or unrelated hashtags.
 - Use at most 1 emoji in the entire post; zero is acceptable.
 - Never use emojis as substitutes for technical explanations.
+
+6. AI DISCLOSURE
+Include this exact disclaimer in every generated LinkedIn post:
+"AI Disclosure: This post was created with AI assistance. Please verify key claims against the original source."
+Place the disclaimer after the engagement question and before the hashtags.
+Treat the disclaimer as mandatory, even when the post is generated using a fallback model.
+Do not duplicate the disclaimer.
+Keep the complete post, including the disclaimer, within the existing 1,100-character limit.
+The disclaimer contains no emoji, so preserve the existing maximum-one-emoji rule.
 
 EDITORIAL STYLE
 - Professional, analytical, concise, and natural.
@@ -146,6 +155,11 @@ OUTPUT CONTRACT
 Return exactly one valid JSON object with exactly these string keys:
 - "post"
 - "image_prompt"
+The post value must include the exact AI disclosure once.
+The disclaimer must not be included in image_prompt.
+Continue returning exactly one valid JSON object with only the existing post and image_prompt string keys.
+Preserve all existing prompt instructions, trust boundaries, source-grounding requirements, image-generation requirements, and JSON formatting rules.
+Update or add a unit test to verify that the generated post includes the exact disclaimer once and stays within 1,100 characters.
 
 The "post" value must:
 - Stay within 1,100 characters.
