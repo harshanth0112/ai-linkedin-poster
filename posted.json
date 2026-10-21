@@ -52,5 +52,9 @@
   {
     "link": "https://www.marktechpost.com/2026/10/19/inception-mercury-3-diffusion-llm",
     "title": "Inception Releases Mercury 3 Diffusion LLM at 1,068 Tokens per Second"
+  },
+  {
+    "link": "https://www.marktechpost.com/2026/10/20/mistral-voxtral-3-speech-models-voice-agent-sdk",
+    "title": "Mistral AI Releases Voxtral 3: Speech-to-Text, TTS and a Voice Agent SDK"
   }
 ]
