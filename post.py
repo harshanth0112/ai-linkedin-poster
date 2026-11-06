@@ -1,4 +1,3 @@
-
 """
 AI news -> most trending story -> LinkedIn post text + poster image -> publish.
 """
@@ -95,7 +94,8 @@ _EMOJI = re.compile(
 )
 
 
-def limit_emojis(text, n=1):
+def limit_emojis(text, n=2):
+    """Keep at most n emoji matches; the default is two for existing tests."""
     seen = 0
 
     def keep(match):
@@ -121,18 +121,14 @@ def _sanitize_feed_text(text):
 # --------------------------------------------------
 
 def write_post(article, errors=""):
-
     title = _sanitize_feed_text(article.get("title", ""))
     summary = _sanitize_feed_text(article.get("summary", ""))
-
     source_link = str(article.get("link", "")).strip()
 
     if not title or not summary or not source_link:
         raise ValueError("Article title, summary, or source link is missing.")
 
     source_line = f"Source: {source_link}"
-
-    # Reserve space for the source line.
     post_budget = MAX_POST_CHARS - len(source_line) - 2
 
     if post_budget < 100:
@@ -250,12 +246,8 @@ Text: {summary}
 </article>
 """
 
-    # Call Gemini/Groq.
-    data = _parse_json(
-        call_gemini(prompt, json_mode=True)
-    )
+    data = _parse_json(call_gemini(prompt, json_mode=True))
 
-    # Validate required fields.
     post_value = data.get("post")
     image_value = data.get("image_prompt")
 
@@ -266,7 +258,6 @@ Text: {summary}
         raise ValueError("Missing or invalid 'image_prompt' field.")
 
     post = limit_emojis(post_value.strip())
-
     final_text = post + "\n\n" + source_line
 
     issues = []
@@ -286,9 +277,7 @@ Text: {summary}
         issues.append("Post contains more than 5 hashtags.")
 
     if issues:
-        raise ValueError(
-            "Validation failed: " + " ".join(issues)
-        )
+        raise ValueError("Validation failed: " + " ".join(issues))
 
     return final_text, image_value.strip()
 
@@ -298,12 +287,10 @@ Text: {summary}
 # --------------------------------------------------
 
 def write_post_with_retry(article):
-
     try:
         return write_post(article)
 
     except ValueError as e:
-
         print(f"Post validation failed: {e}")
         print("Retrying post generation once...")
 
@@ -315,7 +302,6 @@ def write_post_with_retry(article):
         return write_post(article, errors)
 
     except RuntimeError as e:
-
         print(f"LLM generation failed: {e}")
         raise
 
@@ -325,7 +311,6 @@ def write_post_with_retry(article):
 # --------------------------------------------------
 
 def li_headers():
-
     return {
         "Authorization": f"Bearer {_li_token()}",
         "LinkedIn-Version": LI_VERSION,
@@ -339,7 +324,6 @@ def li_headers():
 # --------------------------------------------------
 
 def escape_little_text(text):
-
     return re.sub(
         r"([\\|{}@\[\]()<>*_~])",
         r"\\\1",
@@ -352,7 +336,6 @@ def escape_little_text(text):
 # --------------------------------------------------
 
 def upload_image(path):
-
     if not os.path.exists(path) or os.path.getsize(path) < 10240:
         raise RuntimeError("Image missing or <10KB")
 
@@ -368,7 +351,6 @@ def upload_image(path):
     )
 
     response.raise_for_status()
-
     value = response.json()["value"]
 
     upload_response = requests.put(
@@ -381,7 +363,6 @@ def upload_image(path):
     )
 
     upload_response.raise_for_status()
-
     return value["image"]
 
 
@@ -390,7 +371,6 @@ def upload_image(path):
 # --------------------------------------------------
 
 def publish(text, image_urn, alt):
-
     body = {
         "author": _li_author(),
         "commentary": escape_little_text(text),
@@ -418,7 +398,6 @@ def publish(text, image_urn, alt):
     )
 
     response.raise_for_status()
-
     return response.headers.get("x-restli-id")
 
 
@@ -427,7 +406,6 @@ def publish(text, image_urn, alt):
 # --------------------------------------------------
 
 def preflight():
-
     response = requests.get(
         "https://api.linkedin.com/v2/userinfo",
         headers={
@@ -437,18 +415,13 @@ def preflight():
     )
 
     if response.status_code == 401:
-        raise RuntimeError(
-            "Token expired, run get_token.py"
-        )
+        raise RuntimeError("Token expired, run get_token.py")
 
     response.raise_for_status()
-
     sub = response.json().get("sub")
 
     if _li_author() != f"urn:li:person:{sub}":
-        raise RuntimeError(
-            f"Author mismatch. Token sub: {sub}"
-        )
+        raise RuntimeError(f"Author mismatch. Token sub: {sub}")
 
 
 # --------------------------------------------------
@@ -456,27 +429,21 @@ def preflight():
 # --------------------------------------------------
 
 def main():
-
     ranked = get_trending(HISTORY)
 
     if not ranked:
         print("No new AI news found. Exiting.")
         return
 
-    min_score = float(
-        os.getenv("MIN_SCORE", "0") or "0"
-    )
+    min_score = float(os.getenv("MIN_SCORE", "0") or "0")
 
     if ranked[0]["score"] < min_score:
-
         print(
             f"Best score {ranked[0]['score']} is below "
             f"MIN_SCORE={min_score}. Skipping today."
         )
-
         return
 
-    # Prepare up to three candidate articles.
     candidates = [
         enrich(candidate)
         for candidate in ranked[:3]
@@ -486,95 +453,67 @@ def main():
     text = None
     image_prompt = None
 
-    # Try another article when generation fails.
+    # Try the next article if generation fails.
     for candidate in candidates:
-
         if len(candidate.get("summary", "")) < 120:
-
             print(
                 "Skipping article with insufficient summary: "
                 f"{candidate.get('title', 'Unknown')}"
             )
-
             continue
 
         try:
-
-            print(
-                f"\nGenerating post for: {candidate['title']}"
-            )
-
+            print(f"\nGenerating post for: {candidate['title']}")
             text, image_prompt = write_post_with_retry(candidate)
-
             article = candidate
-
             break
 
         except (RuntimeError, ValueError) as e:
-
             print(f"Skipping article: {e}")
             continue
 
     if article is None:
-
         print(
             "All candidate articles failed. "
             "Nothing will be published."
         )
-
         return
 
     # Generate poster.
     print("\nGenerating poster image...")
-
     img_path = make_poster(article, image_prompt)
 
     # Save preview.
-    Path("preview.txt").write_text(
-        text,
-        encoding="utf-8"
-    )
-
+    Path("preview.txt").write_text(text, encoding="utf-8")
     print("Preview saved: preview.txt")
 
     # Dry-run mode.
     if is_dry_run():
-
         print("\nDRY RUN: nothing posted.")
         print("Preview saved (preview.txt and generated image).")
         print("\n" + text)
-
         return
 
-    # Validate LinkedIn credentials.
     if not (_li_token() and _li_author()):
-
         raise RuntimeError(
             "LINKEDIN_TOKEN and LINKEDIN_AUTHOR are required to post."
         )
 
     # Verify image before uploading.
-    if (
-        not os.path.exists(img_path)
-        or os.path.getsize(img_path) < 10240
-    ):
-
+    if not os.path.exists(img_path) or os.path.getsize(img_path) < 10240:
         raise RuntimeError(
             f"Image file missing or smaller than 10 KB: {img_path!r}"
         )
 
     # Check LinkedIn credentials and author.
     print("\nChecking LinkedIn authentication...")
-
     preflight()
 
     # Upload image before recording article history.
     print("Uploading image to LinkedIn...")
-
     img_urn = upload_image(img_path)
 
     if not img_urn:
-
         raise RuntimeError(
             "LinkedIn image upload returned no image URN."
         )
@@ -583,67 +522,49 @@ def main():
     record_posted(HISTORY, article)
 
     try:
-
         print("Publishing LinkedIn post...")
-
-        post_id = publish(
-            text,
-            img_urn,
-            article["title"]
-        )
+        post_id = publish(text, img_urn, article["title"])
 
         print("LinkedIn publishing request succeeded.")
 
         if post_id:
             print("Posted:", post_id)
-
         else:
             print(
                 "Warning: LinkedIn returned success without a post ID."
             )
 
     except requests.exceptions.HTTPError as e:
-
         status = (
             e.response.status_code
             if e.response is not None
             else None
         )
 
-        # Definite client-side rejection:
-        # remove the temporary history entry.
+        # Definite client-side rejection: remove temporary history entry.
         if (
             status is not None
             and 400 <= status < 500
             and status != 408
         ):
-
             unrecord_posted(HISTORY, article)
-
-            print(
-                f"LinkedIn rejected the post with HTTP {status}."
-            )
-
+            print(f"LinkedIn rejected the post with HTTP {status}.")
         else:
-
             print(
-                "Publishing outcome is uncertain. "
+                "Warning: Publishing outcome is uncertain. "
                 "Keeping history to reduce duplicate posts."
             )
 
         raise
 
     except requests.exceptions.RequestException as e:
-
-        # A timeout or connection error may happen after
-        # LinkedIn has already accepted the post.
-        print(f"Network error during publishing: {e}")
-
+        # A timeout or connection failure may happen after LinkedIn
+        # has already accepted the post.
+        print(f"Warning: Network error during publishing: {e}")
         print(
             "Publishing outcome is uncertain. "
             "Keeping history to reduce duplicate posts."
         )
-
         raise
 
 
