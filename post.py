@@ -18,15 +18,20 @@ from trending import enrich, get_trending, record_posted, unrecord_posted
 
 HISTORY = "posted.json"
 LI_VERSION = os.getenv("LINKEDIN_VERSION", "202609")
+MAX_POST_CHARS = 1100
+
 
 def is_dry_run():
     return os.getenv("DRY_RUN", "1").strip().lower() not in ("0", "false", "no", "off")
 
+
 def _li_token():
     return os.getenv("LINKEDIN_TOKEN", "")
 
+
 def _li_author():
     return os.getenv("LINKEDIN_AUTHOR", "")
+
 
 def _parse_json(raw):
     raw = re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.M).strip()
@@ -38,23 +43,29 @@ def _parse_json(raw):
             return json.loads(raw[start : end + 1])
         raise
 
+
 _EMOJI = re.compile(
     r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF\U00002600-\U000026FF"
     r"\U0001F1E0-\U0001F1FF\U00002300-\U000023FF\U00002B00-\U00002BFF]"
     r"[\uFE0F]?"
 )
 
-def limit_emojis(text, n=2):
+
+def limit_emojis(text, n=1):
     seen = 0
+
     def keep(match):
         nonlocal seen
         seen += 1
         return match.group(0) if seen <= n else ""
+
     return _EMOJI.sub(keep, text)
+
 
 def _sanitize_feed_text(text):
     text = re.sub(r'[\x00-\x1F\x7F]', '', text)
     return text.replace("<", "").replace(">", "")
+
 
 def write_post(article, errors=""):
     title = _sanitize_feed_text(article["title"])
@@ -79,7 +90,8 @@ TRUST BOUNDARIES
 
 POST REQUIREMENTS
 Return a LinkedIn post with a maximum of 1,100 characters, including spaces,
-line breaks, emojis, and hashtags.
+line breaks, emojis, and hashtags. The final published text, including the
+source line added by the application, must also stay within 1,100 characters.
 
 1. HOOK
 - Make the first line specific, compelling, and relevant to the news.
@@ -110,7 +122,7 @@ line breaks, emojis, and hashtags.
 - Encourage substantive discussion, not likes, shares, or engagement bait.
 
 5. HASHTAGS AND EMOJIS
-- Include max number of relevant hashtags at the end of the post.
+- Include up to 5 relevant hashtags at the end; use fewer when appropriate.
 - Use relevant technical or industry-specific hashtags.
 - Do not use duplicate, misleading, or unrelated hashtags.
 - Use at most 1 emoji in the entire post; zero is acceptable.
@@ -147,15 +159,11 @@ Return exactly one valid JSON object with exactly these string keys:
 - "post"
 - "image_prompt"
 
-Continue returning exactly one valid JSON object with only the existing post and image_prompt string keys.
-Preserve all existing prompt instructions, trust boundaries, source-grounding requirements, image-generation requirements, and JSON formatting rules.
-Update or add a unit test to verify that the generated post includes the exact disclaimer once and stays within 1,100 characters.
-
 The "post" value must:
 - Stay within 1,100 characters.
 - Start with the hook on line one.
-- Contain the main insight, one takeaway, one engagement question,
-  and exactly needed max hashtags.
+- Contain the main insight, one takeaway, one engagement question, and up to
+  five relevant hashtags, using only as many as fit naturally.
 - Contain no URLs.
 
 The "image_prompt" value must contain only the visual description.
@@ -172,19 +180,23 @@ Text: {summary}
 
     data = _parse_json(call_gemini(prompt, json_mode=True))
     post = limit_emojis(data["post"].strip())
-    
+    final_text = post + f"\n\nSource: {article['link']}"
+
     issues = []
-    if len(post) > 1300: issues.append("Post exceeds 1300 characters.")
-    if len(post) < 100: issues.append("Post is too short.")
+    if len(final_text) > MAX_POST_CHARS:
+        issues.append(f"Post exceeds {MAX_POST_CHARS} characters including source.")
+    if len(post) < 100:
+        issues.append("Post is too short.")
     if re.search(r'https?://|www\.', post):
         issues.append("Post contains a URL.")
     if len(re.findall(r'#\w+', post)) > 5:
         issues.append("Post contains more than 5 hashtags.")
-    
+
     if issues:
         raise ValueError("Validation failed: " + " ".join(issues))
-        
-    return post + f"\n\nSource: {article['link']}", data["image_prompt"].strip()
+
+    return final_text, data["image_prompt"].strip()
+
 
 def write_post_with_retry(article):
     try:
@@ -192,6 +204,10 @@ def write_post_with_retry(article):
     except ValueError as e:
         errors = f"PREVIOUS ATTEMPT FAILED: {str(e)}\nFix these issues."
         return write_post(article, errors)
+    except RuntimeError as e:
+        print(f"LLM generation failed: {e}")
+        raise
+
 
 def li_headers():
     return {
@@ -201,8 +217,10 @@ def li_headers():
         "Content-Type": "application/json",
     }
 
+
 def escape_little_text(text):
     return re.sub(r"([\\|{}@\[\]()<>*_~])", r"\\\1", text)
+
 
 def upload_image(path):
     if not os.path.exists(path) or os.path.getsize(path) < 10240:
@@ -224,6 +242,7 @@ def upload_image(path):
     up.raise_for_status()  # raises requests.HTTPError on 4xx/5xx
     return value["image"]
 
+
 def publish(text, image_urn, alt):
     body = {
         "author": _li_author(),
@@ -238,6 +257,7 @@ def publish(text, image_urn, alt):
     r.raise_for_status()  # raises requests.HTTPError on 4xx/5xx
     return r.headers.get("x-restli-id")
 
+
 def preflight():
     r = requests.get("https://api.linkedin.com/v2/userinfo", headers={"Authorization": f"Bearer {_li_token()}"}, timeout=20)
     if r.status_code == 401:
@@ -246,6 +266,7 @@ def preflight():
     sub = r.json().get("sub")
     if _li_author() != f"urn:li:person:{sub}":
         raise RuntimeError(f"Author mismatch. Token sub: {sub}")
+
 
 def main():
     ranked = get_trending(HISTORY)
@@ -271,7 +292,7 @@ def main():
 
     if not (_li_token() and _li_author()):
         raise RuntimeError("LINKEDIN_TOKEN and LINKEDIN_AUTHOR are required to post")
-        
+
     # Check image BEFORE recording so a bad image never pollutes history.
     if not os.path.exists(img_path) or os.path.getsize(img_path) < 10_240:
         raise RuntimeError(f"Image file missing or smaller than 10 KB: {img_path!r}")
@@ -290,6 +311,7 @@ def main():
         # Timeout / connection error: post may have gone through. Keep the record.
         print("Warning: post may have gone through (network error). Record kept.")
         raise
+
 
 if __name__ == "__main__":
     main()
