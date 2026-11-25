@@ -151,7 +151,7 @@ class DryRunTests(unittest.TestCase):
             "covered_by": 2,
             "hn_points": 10,
         }
-        payload = json.dumps({"post": "Hook line that is really long and very awesome to read.\n\nInsight is great and very insightful, so long that it passes the 100 char limit easily and flawlessly.\n\n#AI #ML #News", "image_prompt": "abstract circuits"})
+        payload = json.dumps({"post": "Hook line that is really long and very awesome to read.\n\nInsight is great and very insightful, so long that it passes the 100 char limit easily and flawlessly. Which would you trust more?\n\n#AI #ML #News", "image_prompt": "abstract circuits"})
 
         with (
             patch.dict(os.environ, {"DRY_RUN": "1"}, clear=False),
@@ -172,6 +172,156 @@ class DryRunTests(unittest.TestCase):
         preview = Path("preview.txt")
         self.assertTrue(preview.exists())
         self.assertIn("https://example.com/story", preview.read_text(encoding="utf-8"))
+
+
+class PipelineEdgeCaseTests(unittest.TestCase):
+    def test_extract_feed_summary_uses_alternative_content_fields(self):
+        from trending import _extract_feed_summary
+
+        entry = {
+            "summary": "Short",
+            "content": [{"value": "<p>Full &amp; detailed <b>RSS content:encoded</b> body text.</p>"}],
+        }
+        cleaned = _extract_feed_summary(entry)
+        self.assertEqual(cleaned, "Full & detailed RSS content:encoded body text.")
+
+    def test_enrich_failure_falls_back_to_existing_summary(self):
+        import requests
+        from trending import enrich
+
+        article = {
+            "title": "Short AI release",
+            "link": "https://openai.com/news/short-release",
+            "summary": "OpenAI released a faster model for coding.",
+        }
+        with patch("trending.socket.gethostbyname", return_value="93.184.216.34"), \
+             patch("trending.requests.get", side_effect=requests.RequestException("timeout")):
+            result = enrich(article)
+        self.assertEqual(result["summary"], article["summary"])
+
+    def test_short_rss_summary_reaches_content_generation(self):
+        import post
+
+        article = {
+            "title": "New open-weights model released",
+            "summary": "A 7B model with 2x faster inference.",  # < 120 chars
+            "link": "https://example.com/short",
+            "score": 8.5,
+            "source": "TechCrunch",
+        }
+        payload = json.dumps({
+            "post": "A new 7B model just shipped with 2x faster inference for local developers.\n\n• The Shift: Smaller weights.\n\nMy take: Worth testing.\n\nWould you run this locally?\n\n#AI #OpenSource",
+            "image_prompt": "glowing microchip on dark desk",
+        })
+        with (
+            patch.dict(os.environ, {"DRY_RUN": "1", "IMAGE_MODE": "never"}, clear=False),
+            patch.object(post, "get_trending", return_value=[article]),
+            patch.object(post, "enrich", return_value=article),
+            patch.object(post, "call_gemini", return_value=payload) as gemini,
+            patch.object(post, "record_preview_history"),
+        ):
+            rc = post.main()
+            self.assertEqual(rc, 0)
+            gemini.assert_called()
+
+    def test_missing_summary_is_skipped_and_later_candidate_succeeds(self):
+        import post
+
+        bad = {"title": "No summary", "summary": "", "link": "https://example.com/1", "score": 9.0}
+        failing = {"title": "Failing draft", "summary": "Valid summary text here.", "link": "https://example.com/2", "score": 8.5}
+        good = {"title": "Fourth candidate", "summary": "Meaningful AI news summary.", "link": "https://example.com/4", "score": 8.0}
+
+        with (
+            patch.dict(os.environ, {"DRY_RUN": "1", "IMAGE_MODE": "never"}, clear=False),
+            patch.object(post, "get_trending", return_value=[bad, failing, failing, good]),
+            patch.object(post, "enrich", side_effect=lambda a: a),
+            patch.object(post, "write_post_with_retry", side_effect=[ValueError("bad"), ValueError("bad"), ("Post body " + "x" * 100, "prompt")]),
+            patch.object(post, "record_preview_history"),
+        ):
+            rc = post.main()
+            self.assertEqual(rc, 0)
+
+    def test_all_candidates_failing_returns_nonzero(self):
+        import post
+
+        candidates = [
+            {"title": f"Story {i}", "summary": "Meaningful summary.", "link": f"https://example.com/{i}", "score": 8.0}
+            for i in range(8)
+        ]
+        with (
+            patch.dict(os.environ, {"DRY_RUN": "1", "IMAGE_MODE": "never"}, clear=False),
+            patch.object(post, "get_trending", return_value=candidates),
+            patch.object(post, "enrich", side_effect=lambda a: a),
+            patch.object(post, "write_post_with_retry", side_effect=ValueError("LLM failed")),
+        ):
+            rc = post.main()
+            self.assertEqual(rc, 1)
+
+    def test_empty_feeds_returns_zero(self):
+        import post
+
+        with (
+            patch.dict(os.environ, {"DRY_RUN": "0"}, clear=False),
+            patch.object(post, "get_trending", return_value=[]),
+        ):
+            rc = post.main()
+            self.assertEqual(rc, 0)
+
+    def test_live_publish_success_with_mocks(self):
+        import post
+
+        article = {"title": "Live AI story", "summary": "Detailed summary " * 10, "link": "https://example.com/live", "score": 9.0}
+        with (
+            patch.dict(os.environ, {"DRY_RUN": "0", "IMAGE_MODE": "never", "LINKEDIN_TOKEN": "tok", "LINKEDIN_AUTHOR": "urn:li:person:1"}, clear=False),
+            patch.object(post, "get_trending", return_value=[article]),
+            patch.object(post, "enrich", return_value=article),
+            patch.object(post, "write_post_with_retry", return_value=("Post body " + "x" * 100, "prompt")),
+            patch.object(post, "preflight"),
+            patch.object(post, "record_posted") as rec,
+            patch.object(post, "publish", return_value="urn:li:share:123") as pub,
+            patch.object(post, "add_first_comment"),
+            patch.object(post, "log_post"),
+            patch.object(post, "remind_first_hour"),
+        ):
+            rc = post.main()
+            self.assertEqual(rc, 0)
+            rec.assert_called_once()
+            pub.assert_called_once()
+
+    def test_linkedin_auth_failure_returns_nonzero(self):
+        import post
+
+        article = {"title": "Live AI story", "summary": "Detailed summary " * 10, "link": "https://example.com/live", "score": 9.0}
+        with (
+            patch.dict(os.environ, {"DRY_RUN": "0", "IMAGE_MODE": "never", "LINKEDIN_TOKEN": "", "LINKEDIN_AUTHOR": ""}, clear=False),
+            patch.object(post, "get_trending", return_value=[article]),
+            patch.object(post, "enrich", return_value=article),
+            patch.object(post, "write_post_with_retry", return_value=("Post body " + "x" * 100, "prompt")),
+            patch.object(post, "publish") as pub,
+        ):
+            rc = post.main()
+            self.assertEqual(rc, 1)
+            pub.assert_not_called()
+
+    def test_linkedin_publish_http_error_rolls_back_and_returns_nonzero(self):
+        import requests
+        import post
+
+        article = {"title": "Live AI story", "summary": "Detailed summary " * 10, "link": "https://example.com/live", "score": 9.0}
+        with (
+            patch.dict(os.environ, {"DRY_RUN": "0", "IMAGE_MODE": "never", "LINKEDIN_TOKEN": "tok", "LINKEDIN_AUTHOR": "urn:li:person:1"}, clear=False),
+            patch.object(post, "get_trending", return_value=[article]),
+            patch.object(post, "enrich", return_value=article),
+            patch.object(post, "write_post_with_retry", return_value=("Post body " + "x" * 100, "prompt")),
+            patch.object(post, "preflight"),
+            patch.object(post, "record_posted") as rec,
+            patch.object(post, "unrecord_posted") as unrec,
+            patch.object(post, "publish", side_effect=requests.exceptions.HTTPError("500")),
+        ):
+            rc = post.main()
+            self.assertEqual(rc, 1)
+            rec.assert_called_once()
+            unrec.assert_called_once()
 
 
 if __name__ == "__main__":

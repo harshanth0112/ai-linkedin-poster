@@ -20,27 +20,53 @@ WINDOW_HOURS = int(os.getenv("NEWS_WINDOW_HOURS", "48"))
 HN_LOOKUPS = int(os.getenv("HN_LOOKUPS", "15"))
 
 FEEDS = [
-    ("https://openai.com/news/rss.xml", 3.0),
-    ("https://deepmind.google/blog/rss.xml", 3.0),
-    ("https://blog.google/technology/ai/rss/", 3.0),
-    ("https://research.google/blog/rss/", 3.0),
-    ("https://www.microsoft.com/en-us/research/feed/", 3.0),
-    ("https://blogs.nvidia.com/feed/", 3.0),
-    ("https://huggingface.co/blog/feed.xml", 3.0),
-    ("https://aws.amazon.com/blogs/machine-learning/feed/", 3.0),
-    ("https://bair.berkeley.edu/blog/feed.xml", 3.0),
-    ("https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml", 3.0),
-    ("https://www.technologyreview.com/topic/artificial-intelligence/feed", 2.5),
-    ("https://techcrunch.com/category/artificial-intelligence/feed/", 2.5),
-    ("https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", 2.5),
-    ("https://arstechnica.com/ai/feed/", 2.5),
-    ("https://www.wired.com/feed/tag/ai/latest/rss", 2.5),
-    ("https://venturebeat.com/category/ai/feed/", 2.5),
-    ("https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss", 2.5),
-    ("https://www.theguardian.com/technology/artificialintelligenceai/rss", 2.5),
-    ("https://simonwillison.net/atom/everything/", 1.5),
-    ("https://importai.substack.com/feed", 1.5),
-    ("https://www.interconnects.ai/feed", 1.5),
+# TIER 1: OFFICIAL AI COMPANIES & RESEARCH # Weight: 2.8–3.0 
+
+("https://openai.com/news/rss.xml", 2.8), 
+("https://deepmind.google/blog/rss.xml", 2.8), 
+("https://blog.google/technology/ai/rss/", 2.9), 
+("https://research.google/blog/rss/", 2.9), 
+("https://www.microsoft.com/en-us/research/feed/", 2.8), 
+("https://machinelearning.apple.com/rss.xml", 2.8), 
+("https://engineering.fb.com/feed/", 2.8), 
+("https://developer.nvidia.com/blog/feed/", 2.8), 
+("https://huggingface.co/blog/feed.xml", 2.8), 
+("https://aws.amazon.com/blogs/machine-learning/feed/", 2.8), 
+("https://bair.berkeley.edu/blog/feed.xml", 2.8), 
+("https://ai.stanford.edu/blog/feed.xml", 2.7), 
+("https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml", 2.7), # TIER 2: INDIA — AI, BUSINESS & GOVERNMENT # Weight: 2.5–2.8 
+
+("https://indianexpress.com/section/technology/artificial-intelligence/feed/", 2.8), 
+("https://cio.economictimes.indiatimes.com/rss/artificial-intelligence", 2.7), 
+("https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=1", 2.6), 
+# Google News — India-focused AI searches 
+("https://news.google.com/rss/search?q=artificial+intelligence+India&hl=en-IN&gl=IN&ceid=IN:en", 2.2), 
+("https://news.google.com/rss/search?q=generative+AI+India&hl=en-IN&gl=IN&ceid=IN:en", 2.2), 
+("https://news.google.com/rss/search?q=AI+startups+India&hl=en-IN&gl=IN&ceid=IN:en", 2.0), 
+("https://news.google.com/rss/search?q=AI+policy+India&hl=en-IN&gl=IN&ceid=IN:en", 2.0), 
+# TIER 3: INDEPENDENT TECH JOURNALISM # Weight: 2.4–2.8 
+
+("https://www.technologyreview.com/topic/artificial-intelligence/feed", 2.8), 
+("https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss", 2.8), 
+("https://techcrunch.com/category/artificial-intelligence/feed/", 2.7), 
+("https://arstechnica.com/ai/feed/", 2.7), 
+("https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", 2.6), 
+("https://www.wired.com/feed/rss", 2.5), 
+("https://venturebeat.com/feed/", 2.6), 
+("https://www.theguardian.com/technology/artificialintelligenceai/rss", 2.5), 
+("https://the-decoder.com/feed/", 2.5), 
+("https://www.marktechpost.com/feed/", 2.2),
+ # Google News — global AI coverage 
+("https://news.google.com/rss/search?q=artificial+intelligence+technology&hl=en-US&gl=US&ceid=US:en", 2.1), 
+("https://news.google.com/rss/search?q=AI+research+breakthrough&hl=en-US&gl=US&ceid=US:en", 2.1), 
+("https://news.google.com/rss/search?q=large+language+model+release&hl=en-US&gl=US&ceid=US:en", 2.0), 
+# TIER 4: AI & MACHINE LEARNING RESEARCH # Note: Research papers may be preprints. 
+("https://rss.arxiv.org/rss/cs.AI", 2.7), 
+("https://rss.arxiv.org/rss/cs.LG", 2.7), 
+("https://rss.arxiv.org/rss/cs.CL", 2.5), 
+# Research conference announcements 
+("https://blog.neurips.cc/feed", 2.5), 
+("https://blog.iclr.cc/feed", 2.5), 
 ]
 
 def _get_domain(url):
@@ -72,6 +98,35 @@ _MARKETING = re.compile(
     r"how\s+.{0,80}\b(?:cuts?|cutting|turns?|turning|saves?|saving)\b)"
 )
 AI_TERMS = re.compile(r"(?i)\b(ai|ml|llm|gpt|model|artificial intelligence|machine learning|deep learning|neural|openai|deepmind|anthropic)\b")
+
+# Builder and release terms: practical technical progress, models, weights, tooling, benchmarks
+BUILDER_TERMS = re.compile(
+    r"(?i)\b(release|releases|released|open-source|open weights|model weights|benchmark|benchmarks|"
+    r"framework|agent|agents|agentic|fine-tun\w*|dataset|developer tools|inference|sdk|api|"
+    r"research paper|model launch|speedup|architecture)\b"
+)
+
+# Sensationalism terms: doom and apocalypse rhetoric (does not penalize legitimate security/safety research)
+SENSATIONALISM_TERMS = re.compile(
+    r"(?i)\b(apocalypse|doomsday|existential catastrophe|emergency brake|kill switch|extinction event)\b"
+)
+
+# Topic taxonomy categories
+TOPIC_CATEGORIES = {
+    "research": re.compile(r"(?i)\b(research paper|arxiv|benchmark|novel|breakthrough|theorem|architecture|evaluation)\b"),
+    "open_source": re.compile(r"(?i)\b(open-source|open weights|weights|github|huggingface|apache|mit license|reproducible)\b"),
+    "tools_agents": re.compile(r"(?i)\b(developer tools|sdk|agent|agents|agentic|framework|api|langchain|pipeline)\b"),
+    "infrastructure": re.compile(r"(?i)\b(gpu|tpu|chips|datacenter|nvidia|cuda|hardware|infrastructure|inference engine)\b"),
+    "business": re.compile(r"(?i)\b(funding|valuation|acquisition|startup|enterprise|revenue|market|commercial)\b"),
+    "safety_security": re.compile(r"(?i)\b(safety|security|vulnerability|jailbreak|alignment|red team|exploit|policy|regulation)\b"),
+}
+
+def classify_topic(title, summary=""):
+    text = f"{title} {summary}"
+    for cat, pattern in TOPIC_CATEGORIES.items():
+        if pattern.search(text):
+            return cat
+    return "general_ai"
 
 def is_marketing(title):
     return bool(_MARKETING.search(title or ""))
@@ -123,6 +178,34 @@ def unrecord_posted(path, article):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(new_hist[-500:], f, indent=2, ensure_ascii=False)
 
+def _clean_html_text(raw):
+    """Strip scripts/styles, HTML tags, unescape entities, and collapse whitespace."""
+    if not raw:
+        return ""
+    text = html.unescape(str(raw))
+    text = re.sub(r"(?is)<(script|style|noscript).*?</\1>", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html.unescape(text)
+    return _strip_ctrl(re.sub(r"\s+", " ", text).strip())
+
+def _extract_feed_summary(entry):
+    """Extract the richest available summary from RSS/Atom entry fields."""
+    candidates = [
+        entry.get("summary"),
+        entry.get("description"),
+        entry.get("subtitle"),
+    ]
+    summary_detail = entry.get("summary_detail")
+    if isinstance(summary_detail, dict):
+        candidates.append(summary_detail.get("value"))
+    for content_item in entry.get("content") or []:
+        if isinstance(content_item, dict):
+            candidates.append(content_item.get("value"))
+    cleaned = [_clean_html_text(c) for c in candidates if c]
+    if not cleaned:
+        return ""
+    return max(cleaned, key=len)[:2500]
+
 def _fetch_one_feed(url, weight, posted_links, seen):
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(hours=WINDOW_HOURS)
@@ -142,11 +225,11 @@ def _fetch_one_feed(url, weight, posted_links, seen):
         when = datetime(*t[:6], tzinfo=timezone.utc)
         if when < cutoff: continue
         seen.add(link)
-        summary = re.sub(r"<[^>]+>", " ", html.unescape(e.get("summary", "") or ""))
+        summary = _extract_feed_summary(e)
         items.append({
             "title": _strip_ctrl(html.unescape(e.get("title", "")).strip()),
             "link": link,
-            "summary": _strip_ctrl(re.sub(r"\s+", " ", summary).strip()[:2000]),
+            "summary": summary,
             "when": when,
             "source": feed.feed.get("title", url),
             "weight": weight,
@@ -195,10 +278,13 @@ def rank(items, now=None, hn=None):
         thin = -2.0 if len(it["summary"]) < 60 else 0.0
         marketing = -2.5 if is_marketing(it["title"]) else 0.0
         offtopic = -2.0 if not AI_TERMS.search(it["title"]) and not AI_TERMS.search(it["summary"]) else 0.0
+        builder_boost = 1.5 if BUILDER_TERMS.search(it["title"]) or BUILDER_TERMS.search(it["summary"]) else 0.0
+        panic_penalty = -1.5 if SENSATIONALISM_TERMS.search(it["title"]) else 0.0
         it["covered_by"] = len(outlets)
         it["hn_points"] = points
         it["marketing"] = marketing < 0
-        it["score"] = round(it["weight"] + recency + coverage + buzz + thin + marketing + offtopic, 2)
+        it["topic"] = classify_topic(it["title"], it.get("summary", ""))
+        it["score"] = round(it["weight"] + recency + coverage + buzz + thin + marketing + offtopic + builder_boost + panic_penalty, 2)
     return sorted(items, key=lambda x: x["score"], reverse=True)
 
 def get_trending(history_path="posted.json"):
@@ -231,8 +317,11 @@ def enrich(article):
     - At most MAX_HOPS (3) redirect responses are accepted.
     - Response body is capped at 1.5 MB.
     """
-    if len(article.get("summary", "")) >= 500:
-        return article
+    existing_summary = _extract_feed_summary(article) if any(
+        k in article for k in ("description", "subtitle", "content", "summary_detail")
+    ) else _clean_html_text(article.get("summary", ""))
+    if len(existing_summary) >= 500:
+        return {**article, "summary": existing_summary} if existing_summary != article.get("summary") else article
     try:
         MAX_HOPS = 3
         current_url = article["link"]
@@ -242,47 +331,45 @@ def enrich(article):
 
             # --- per-hop scheme check ---
             if parsed.scheme != "https":
-                return article
+                return {**article, "summary": existing_summary} if existing_summary else article
 
             # --- per-hop domain allowlist check ---
             domain = _get_domain(current_url)
             if domain not in FEED_DOMAINS:
-                return article
+                return {**article, "summary": existing_summary} if existing_summary else article
 
             # --- per-hop private/loopback IP check ---
             try:
                 ip = socket.gethostbyname(parsed.hostname)
             except socket.gaierror:
-                return article
+                return {**article, "summary": existing_summary} if existing_summary else article
             if ipaddress.ip_address(ip).is_private or ipaddress.ip_address(ip).is_loopback:
-                return article
+                return {**article, "summary": existing_summary} if existing_summary else article
 
             # Fetch with redirects disabled so we validate before following
-            r = requests.get(
+            with requests.get(
                 current_url, headers=HEADERS, timeout=10,
                 allow_redirects=False, stream=True,
-            )
+            ) as r:
+                if 300 <= r.status_code < 400:
+                    location = r.headers.get("Location", "").strip()
+                    if not location:
+                        return {**article, "summary": existing_summary} if existing_summary else article
+                    current_url = urljoin(current_url, location)  # handles relative URLs
+                    continue  # validate the next hop before fetching
 
-            if 300 <= r.status_code < 400:
-                location = r.headers.get("Location", "").strip()
-                if not location:
-                    return article
-                current_url = urljoin(current_url, location)  # handles relative URLs
-                continue  # validate the next hop before fetching
+                r.raise_for_status()
 
-            r.raise_for_status()
-
-            # --- 1.5 MB size cap ---
-            content = r.raw.read(1_500_000, decode_content=True)
-            page = content.decode("utf-8", errors="replace")
-            page = re.sub(r"(?is)<(script|style|noscript).*?</\1>", " ", page)
-            paras = re.findall(r"(?is)<p[^>]*>(.*?)</p>", page)
-            text = " ".join(re.sub(r"<[^>]+>", " ", p) for p in paras)
-            text = _strip_ctrl(re.sub(r"\s+", " ", html.unescape(text)).strip())
-            if len(text) > len(article.get("summary", "")):
-                return {**article, "summary": text[:2500]}
-            return article
+                # --- 1.5 MB size cap ---
+                content = r.raw.read(1_500_000, decode_content=True)
+                page = content.decode("utf-8", errors="replace")
+                page = re.sub(r"(?is)<(script|style|noscript).*?</\1>", " ", page)
+                paras = re.findall(r"(?is)<p[^>]*>(.*?)</p>", page)
+                text = _clean_html_text(" ".join(paras))
+                if len(text) > len(existing_summary) and len(text.split()) >= 15:
+                    return {**article, "summary": text[:2500]}
+                return {**article, "summary": existing_summary} if existing_summary else article
 
     except (requests.RequestException, socket.gaierror):
         pass
-    return article
+    return {**article, "summary": existing_summary} if existing_summary else article
