@@ -299,8 +299,8 @@ class PipelineEdgeCaseTests(unittest.TestCase):
             patch.object(post, "write_post_with_retry", return_value=("Post body " + "x" * 100, "prompt")),
             patch.object(post, "publish") as pub,
         ):
-            rc = post.main()
-            self.assertEqual(rc, 1)
+            with self.assertRaises(RuntimeError):
+                post.main()
             pub.assert_not_called()
 
     def test_linkedin_publish_http_error_rolls_back_and_returns_nonzero(self):

@@ -831,11 +831,9 @@ def main():
         try:
             captions = write_poster_captions(article) if poster_style() in ("story", "meme") else None
             img_path = make_poster(article, image_prompt, captions=captions)
-            if not img_path or not os.path.exists(img_path) or os.path.getsize(img_path) < 10_240:
-                raise RuntimeError(f"Image file missing or smaller than 10 KB: {img_path!r}")
         except Exception as e:
             print(f"OUTCOME: Image generation failed ({type(e).__name__}: {e}).")
-            return 1
+            raise
 
     # STEP 6: Always write preview.txt so dry-run and live runs both leave an artifact
     preview = text + (f"\n\n[FIRST COMMENT]\n{source_line}" if source_in_comment() else "")
@@ -853,14 +851,16 @@ def main():
         print("OUTCOME: Dry run completed successfully.")
         return 0  # <-- exits here for dry run; everything below is live-only
 
-    # STEP 8 & 9: Validate LinkedIn credentials and verify token/author (preflight check)
+    # STEP 8 & 9: Validate LinkedIn credentials, image integrity, and verify token/author (preflight check)
     try:
         if not (_li_token() and _li_author()):
             raise RuntimeError("LINKEDIN_TOKEN and LINKEDIN_AUTHOR are required to post")
+        if with_image and (not img_path or not os.path.exists(img_path) or os.path.getsize(img_path) < 10_240):
+            raise RuntimeError(f"Image file missing or smaller than 10 KB: {img_path!r}")
         preflight()
     except Exception as e:
-        print(f"OUTCOME: LinkedIn authentication failed ({type(e).__name__}: {e}).")
-        return 1
+        print(f"OUTCOME: LinkedIn authentication or image check failed ({type(e).__name__}: {e}).")
+        raise
 
     # STEP 10: Record the article as posted BEFORE publishing
     # (so if LinkedIn times out, we don't accidentally double-post on retry)
