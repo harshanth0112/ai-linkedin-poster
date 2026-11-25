@@ -62,7 +62,7 @@ jobs:
           # Engagement settings
           SOURCE_IN_COMMENT: "1"     # link goes in the first comment, not the post body
           IMAGE_MODE: "always"       # always | never | alternate (A/B test image vs text-only)
-          POSTER_STYLE: "story"      # story = portrait infographic (or meme for light stories) | classic = headline on image
+          POSTER_STYLE: "meme"       # meme = relatable tech meme card | story = editorial infographic | classic = headline on image
           HASHTAG_COUNT: "8"         # hashtags per post (3-15); topped up with story-related tags if the model gives fewer
           POSTER_FOOTER: ""          # optional small tag on the poster, e.g. "@yourname"
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}   # optional: phone reminder to reply in the first hour

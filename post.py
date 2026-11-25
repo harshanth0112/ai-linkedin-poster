@@ -364,12 +364,20 @@ def _poster_prompt(article, errors=""):
     title = _sanitize_feed_text(article["title"])
     summary = _sanitize_feed_text(article["summary"])[:1200]
     topic = article.get("topic", "general_ai")
-    return f"""You design a professional editorial tech-news infographic for a LinkedIn post.
+    style = poster_style()
+    meme_instruction = ""
+    if style == "meme":
+        meme_instruction = """
+IMPORTANT: The user explicitly requested MEME style image captions.
+Always set "tone": "funny" unless the story involves tragic events (death, accidents, crimes, disasters).
+Craft a hilarious, highly relatable contrast or dialogue about this AI news (e.g., expectation vs reality, AI model vs GPU bill, AI vs junior dev, tech boss vs engineer).
+"""
+    return f"""You design a professional editorial tech-news infographic or relatable tech meme for a LinkedIn post.
 Return JSON with these keys:
-
+{meme_instruction}
 "tone": "editorial", "story", or "funny".
-  Use "editorial" as the primary default for tech and AI news: it produces a sleek 3D focal visual with high-contrast metric and takeaway cards.
-  Choose "funny" ONLY for lighthearted workplace humor or relatable developer memes.
+  Use "funny" when tone is lighthearted, relatable developer humor, or tech memes.
+  Use "editorial" for high-contrast news metrics and takeaway cards.
   For anything involving death, crime, violence, abuse, self-harm, privacy breaches, layoffs, lawsuits, war, disasters or victims, always choose "editorial" or "story".
 
 If tone is "editorial":

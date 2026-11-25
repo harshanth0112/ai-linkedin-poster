@@ -206,12 +206,63 @@ def ai_background(prompt):
     return _ai_image(prompt)
 
 
+def _overlay_meme(img, captions):
+    """
+    Renders clean, highly engaging meme text / dialogue panels over the image.
+    Supports 2-character dialogue ("AI" vs "Me") or top/bottom punchlines.
+    """
+    img = img.convert("RGBA")
+    draw = ImageDraw.Draw(img)
+
+    tone = captions.get("tone")
+    if tone == "funny" and captions.get("line1") and captions.get("line2"):
+        l1_who = (captions.get("line1_who") or "AI").upper()
+        l1 = captions.get("line1")
+        l2_who = (captions.get("line2_who") or "ME").upper()
+        l2 = captions.get("line2")
+
+        # Top dialog card (Speaker 1)
+        card_w = int(W * 0.88)
+        card_x = (W - card_w) // 2
+        card_h = 100
+        y1 = 35
+
+        # Background rounded box for readability
+        draw.rounded_rectangle([card_x, y1, card_x + card_w, y1 + card_h], radius=16, fill=(15, 23, 42, 230), outline=(56, 189, 248, 255), width=3)
+        draw.text((card_x + 25, y1 + 14), f"[{l1_who}]", font=_font(28), fill=(56, 189, 248, 255))
+        draw.text((card_x + 25, y1 + 50), l1, font=_font(32), fill=(255, 255, 255, 255))
+
+        # Bottom dialog card (Speaker 2 / Punchline)
+        y2 = H - card_h - 35
+        draw.rounded_rectangle([card_x, y2, card_x + card_w, y2 + card_h], radius=16, fill=(15, 23, 42, 230), outline=(244, 63, 94, 255), width=3)
+        draw.text((card_x + 25, y2 + 14), f"[{l2_who}]", font=_font(28), fill=(244, 63, 94, 255))
+        draw.text((card_x + 25, y2 + 50), l2, font=_font(32), fill=(255, 255, 255, 255))
+    else:
+        # Editorial / Punchy headline top & bottom banner
+        headline = captions.get("headline", "")
+        metric = captions.get("key_metric", "")
+        card_w = int(W * 0.90)
+        card_x = (W - card_w) // 2
+        card_h = 95
+        y = H - card_h - 40
+        draw.rounded_rectangle([card_x, y, card_x + card_w, y + card_h], radius=16, fill=(15, 23, 42, 235), outline=(59, 130, 246, 255), width=3)
+        if metric:
+            draw.text((card_x + 25, y + 14), f"KEY METRIC: {metric}", font=_font(24), fill=(52, 211, 153, 255))
+            draw.text((card_x + 25, y + 46), headline[:75], font=_font(32), fill=(255, 255, 255, 255))
+        else:
+            draw.text((card_x + 25, y + 28), headline[:75], font=_font(34), fill=(255, 255, 255, 255))
+
+    return img.convert("RGB")
+
+
 # ---------- Public function ----------
-def make_image(prompt, headline=None, path="image.jpg"):
+def make_image(prompt, headline=None, path="image.jpg", captions=None):
     """Returns the saved image path. headline = short text drawn on the thumbnail (optional)."""
     img = _ai_image(prompt) or _fallback_background()
     img = ImageOps.fit(img, (W, H), method=Image.Resampling.LANCZOS)  # crop/resize to exactly 1200x627
-    if headline and os.getenv("THUMB_TEXT", "1") == "1":
+    if captions:
+        img = _overlay_meme(img, captions)
+    elif headline and os.getenv("THUMB_TEXT", "1") == "1":
         img = _overlay_title(img, headline)
     img.save(path, "JPEG", quality=90)
     return path
