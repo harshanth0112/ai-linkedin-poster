@@ -17,6 +17,7 @@ Env options (all optional):
 import base64
 import io
 import os
+import re
 import textwrap
 import time
 import urllib.parse

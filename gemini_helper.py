@@ -28,8 +28,8 @@ def _models(var, default):
     return [m.strip() for m in os.getenv(var, default).split(",") if m.strip()]
 
 
-GEMINI_MODELS = _models("GEMINI_MODELS", "gemini-3.8-flash")
-GROQ_MODELS = _models("GROQ_MODELS", "qwen/qwen3.8-27b,llama-3.3-70b-versatile")
+GEMINI_MODELS = _models("GEMINI_MODELS", "gemini-3.8-flash,gemini-2.5-flash,gemini-2.0-flash")
+GROQ_MODELS = _models("GROQ_MODELS", "qwen/qwen3.8-27b,llama-3.1-70b-versatile,llama-3.1-8b-instant")
 
 
 def _gemini_keys():
