@@ -351,7 +351,7 @@ def enrich(article):
                 current_url, headers=HEADERS, timeout=10,
                 allow_redirects=False, stream=True,
             ) as r:
-                if 300 <= r.status_code < 400:
+                if isinstance(getattr(r, "status_code", None), int) and 300 <= r.status_code < 400:
                     location = r.headers.get("Location", "").strip()
                     if not location:
                         return {**article, "summary": existing_summary} if existing_summary else article
