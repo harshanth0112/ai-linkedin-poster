@@ -347,10 +347,11 @@ def enrich(article):
                 return {**article, "summary": existing_summary} if existing_summary else article
 
             # Fetch with redirects disabled so we validate before following
-            with requests.get(
+            r = requests.get(
                 current_url, headers=HEADERS, timeout=10,
                 allow_redirects=False, stream=True,
-            ) as r:
+            )
+            try:
                 if isinstance(getattr(r, "status_code", None), int) and 300 <= r.status_code < 400:
                     location = r.headers.get("Location", "").strip()
                     if not location:
@@ -362,13 +363,16 @@ def enrich(article):
 
                 # --- 1.5 MB size cap ---
                 content = r.raw.read(1_500_000, decode_content=True)
-                page = content.decode("utf-8", errors="replace")
+                page = content.decode("utf-8", errors="replace") if isinstance(content, (bytes, bytearray)) else str(content)
                 page = re.sub(r"(?is)<(script|style|noscript).*?</\1>", " ", page)
                 paras = re.findall(r"(?is)<p[^>]*>(.*?)</p>", page)
                 text = _clean_html_text(" ".join(paras))
                 if len(text) > len(existing_summary) and len(text.split()) >= 15:
                     return {**article, "summary": text[:2500]}
                 return {**article, "summary": existing_summary} if existing_summary else article
+            finally:
+                if hasattr(r, "close"):
+                    r.close()
 
     except (requests.RequestException, socket.gaierror):
         pass

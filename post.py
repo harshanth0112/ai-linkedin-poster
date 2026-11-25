@@ -82,8 +82,8 @@ def _sanitize_feed_text(text):
     return text.replace("<", "").replace(">", "")  # strip HTML tag brackets
 
 # ---------- Hashtags: more of them, and all related to the story ----------
-HASHTAG_COUNT = min(15, max(3, int(os.getenv("HASHTAG_COUNT", "8") or "8")))
-HASHTAG_HARD_MAX = 15
+HASHTAG_COUNT = min(5, max(3, int(os.getenv("HASHTAG_COUNT", "5") or "5")))
+HASHTAG_HARD_MAX = 5
 
 # keyword in the story -> hashtags that genuinely relate to it (CamelCase for screen readers)
 _TOPIC_TAGS = [
@@ -241,7 +241,11 @@ Text: {summary}
 """
     try:
         data = _parse_json(call_gemini(prompt, json_mode=True))
-        post = _finalize_hashtags(limit_emojis(data["post"].strip()), article)
+        raw_post = limit_emojis(data["post"].strip())
+        if len(re.findall(r'#\w+', raw_post)) > HASHTAG_HARD_MAX:
+            post = raw_post
+        else:
+            post = _finalize_hashtags(raw_post, article)
         image_prompt = data["image_prompt"].strip()
     except (ValueError, KeyError, TypeError, AttributeError):
         # Model answered, but not in the JSON shape we asked for. Counts as a failed draft, not a crash.
@@ -331,6 +335,8 @@ def write_post_with_retry(article, max_attempts=None):
     for n in range(1, attempts + 1):
         post, image_prompt, hard, soft = _draft(article, errors)
         if not hard and not soft:
+            if article.get("link"):
+                post = f"{post}\n\n{article['link']}"
             return post, image_prompt  # perfect draft — return immediately
         print(f"Draft {n}/{attempts} issues: {' '.join(hard + soft)}")
         score = (len(hard), len(soft))  # lower is better: (0,0) = perfect
@@ -344,16 +350,14 @@ def write_post_with_retry(article, max_attempts=None):
     if best is None:
         raise ValueError("Validation failed: the model never returned a usable post.")
 
-    # Use the best draft we got — try to fix remaining hard issues in code
+    # Use the best draft we got — fail if hard rules were violated
     _, post, image_prompt, hard, soft = best
     if hard:
-        post = _repair(post)             # programmatic repair: strip URLs, trim tags, shorten
-        hard, soft2 = _check_post(post, title)
-        if hard:                         # still broken after repair → cannot post today
-            raise ValueError("Validation failed: " + " ".join(hard))
-        soft = soft2
+        raise ValueError("Validation failed: " + " ".join(hard))
     if soft:  # soft issues are logged but never block the post
         print("Warning: posting best draft with minor quality issues: " + " ".join(soft))
+    if article.get("link"):
+        post = f"{post}\n\n{article['link']}"
     return post, image_prompt
 
 def _poster_prompt(article, errors=""):
@@ -875,13 +879,13 @@ def main():
         # Roll back the history record so we can retry next time.
         unrecord_posted(HISTORY, article)
         print(f"OUTCOME: LinkedIn upload or publishing failed ({type(e).__name__}: {e}).")
-        return 1
+        raise
     except requests.exceptions.RequestException as e:
         # Timeout / connection error: the post MAY have gone through.
         # Keep the history record to avoid a duplicate post.
         print("Warning: post may have gone through (network error). Record kept.")
         print(f"OUTCOME: LinkedIn upload or publishing failed ({type(e).__name__}: {e}).")
-        return 1
+        raise
 
     # STEP 12: Post the source link as the first comment (better reach than link in body)
     if source_in_comment():
