@@ -318,8 +318,8 @@ class PipelineEdgeCaseTests(unittest.TestCase):
             patch.object(post, "unrecord_posted") as unrec,
             patch.object(post, "publish", side_effect=requests.exceptions.HTTPError("500")),
         ):
-            rc = post.main()
-            self.assertEqual(rc, 1)
+            with self.assertRaises(requests.exceptions.HTTPError):
+                post.main()
             rec.assert_called_once()
             unrec.assert_called_once()
 
