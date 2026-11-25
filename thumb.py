@@ -45,33 +45,35 @@ def _gemini_image(prompt):
     if not models:
         print("Skipping Gemini image (GEMINI_IMAGE_MODELS is empty)")
         return None
-    key = os.getenv("GEMINI_API_KEY")
-    if not key:
+    raw = os.getenv("GEMINI_API_KEYS") or os.getenv("GEMINI_API_KEY") or ""
+    keys = [k.strip() for k in re.split(r"[,;\s]+", raw) if k.strip()]
+    if not keys:
         return None
     for model in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        body = {
-            "contents": [{"parts": [{"text": f"{prompt}. {STYLE}. Wide landscape 1.91:1 composition."}]}],
-            "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
-        }
-        try:
-            r = requests.post(url, headers={"x-goog-api-key": key}, json=body, timeout=120)
-        except requests.RequestException as e:
-            print(f"Image {model}: network error ({type(e).__name__})")
-            continue
-        if r.status_code != 200:
-            print(f"Image {model}: HTTP {r.status_code} {r.text[:120]}")
-            continue
-        try:
-            for part in r.json()["candidates"][0]["content"]["parts"]:
-                data = (part.get("inlineData") or part.get("inline_data") or {}).get("data")
-                if data:
-                    print(f"Image from Gemini model: {model}")
-                    return Image.open(io.BytesIO(base64.b64decode(data))).convert("RGB")
-        except Exception as e:
-            print(f"Image {model}: could not read response ({type(e).__name__})")
-            continue
-        print(f"Image {model}: response had no image")
+        for key in keys:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            body = {
+                "contents": [{"parts": [{"text": f"{prompt}. {STYLE}. Wide landscape 1.91:1 composition."}]}],
+                "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+            }
+            try:
+                r = requests.post(url, headers={"x-goog-api-key": key}, json=body, timeout=120)
+            except requests.RequestException as e:
+                print(f"Image {model}: network error ({type(e).__name__})")
+                continue
+            if r.status_code != 200:
+                print(f"Image {model}: HTTP {r.status_code} {r.text[:120]}")
+                continue
+            try:
+                for part in r.json()["candidates"][0]["content"]["parts"]:
+                    data = (part.get("inlineData") or part.get("inline_data") or {}).get("data")
+                    if data:
+                        print(f"Image from Gemini model: {model}")
+                        return Image.open(io.BytesIO(base64.b64decode(data))).convert("RGB")
+            except Exception as e:
+                print(f"Image {model}: could not read response ({type(e).__name__})")
+                continue
+            print(f"Image {model}: response had no image")
     return None
 
 

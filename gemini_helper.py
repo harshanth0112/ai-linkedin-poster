@@ -32,8 +32,15 @@ GEMINI_MODELS = _models("GEMINI_MODELS", "gemini-3.8-flash")
 GROQ_MODELS = _models("GROQ_MODELS", "qwen/qwen3.8-27b,llama-3.3-70b-versatile")
 
 
-def _try_gemini(model, prompt, json_mode):
-    key = os.environ["GEMINI_API_KEY"]
+def _gemini_keys():
+    """Return list of non-empty Gemini API keys from GEMINI_API_KEYS or GEMINI_API_KEY (comma or space separated)."""
+    raw = os.getenv("GEMINI_API_KEYS") or os.getenv("GEMINI_API_KEY") or ""
+    keys = [k.strip() for k in re.split(r"[,;\s]+", raw) if k.strip()]
+    return keys
+
+
+def _try_gemini(model, prompt, json_mode, key=None):
+    key = key or os.getenv("GEMINI_API_KEY", "")
     body = {"contents": [{"parts": [{"text": prompt}]}]}
     if json_mode:
         body["generationConfig"] = {"responseMimeType": "application/json"}
@@ -98,19 +105,21 @@ def _try_groq(model, prompt, json_mode):
 
 
 def call_gemini(prompt, json_mode=False):
-    """Name kept for compatibility: tries Gemini, then Groq. Returns text."""
+    """Name kept for compatibility: tries Gemini across available keys, then Groq. Returns text."""
     last = "no models configured"
+    keys = _gemini_keys()
 
-    if not os.getenv("GEMINI_API_KEY"):
+    if not keys:
         print("GEMINI_API_KEY not set; skipping Gemini.")
         last = "GEMINI_API_KEY not set"
     else:
         for model in GEMINI_MODELS:
-            text, err = _try_gemini(model, prompt, json_mode)
-            if text:
-                print(f"Used Gemini model: {model}")
-                return text
-            last = f"Gemini {model}: {err}"
+            for key in keys:
+                text, err = _try_gemini(model, prompt, json_mode, key=key)
+                if text:
+                    print(f"Used Gemini model: {model}")
+                    return text
+                last = f"Gemini {model}: {err}"
 
     if os.getenv("GROQ_API_KEY"):
         print("All Gemini models failed. Trying Groq...")
