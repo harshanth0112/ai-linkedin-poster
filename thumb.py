@@ -41,7 +41,12 @@ FONT_CANDIDATES = [
 # ---------- Sources ----------
 def _gemini_image(prompt):
     models = [
-        m.strip() for m in os.getenv("GEMINI_IMAGE_MODELS", "gemini-2.5-flash-image").split(",") if m.strip()
+        m.strip()
+        for m in os.getenv(
+            "GEMINI_IMAGE_MODELS",
+            "gemini-3.1-flash-image,gemini-3-pro-image,gemini-2.5-flash-image",
+        ).split(",")
+        if m.strip()
     ]
     if not models:
         print("Skipping Gemini image (GEMINI_IMAGE_MODELS is empty)")
